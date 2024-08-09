@@ -1,0 +1,4 @@
+Barlow Twins: https://vissl.ai/
+CLIP: https://github.com/openai/CLIP
+PubMedCLIP: https://github.com/sarahESL/PubMedCLIP
+WideResNet50 (PatchCore backbone): https://download.pytorch.org/models/wide_resnet50_2-9ba9bcbe.pth
