@@ -1,0 +1,26 @@
+executor: slurm
+latency-wait: 5
+jobs: 30
+cores: 1
+software-deployment-method: apptainer
+singularity-args: "--nv -B /home/space/datasets:/data"
+keep-going: True
+rerun-incomplete: True
+
+printshellcmds: True
+show-failed-logs: True
+
+default-resources:
+  slurm_account: "jkauffmann"
+  slurm_partition: "'gpu-2d'"
+  # slurm_extra: "'--output=logs/%j.out --error=logs/%j.err'"
+  runtime: 2880 # minutes
+  cpus_per_task: 2
+  gpus_per_task: 1
+  mem_mb: 16000
+
+set-resources:
+  gpu_test:
+    slurm_partition: "gpu-2h"
+    runtime: 1 # minutes
+    gpus_per_task: 1

@@ -1,0 +1,173 @@
+import os
+
+configfile: "workflow/config/config.yaml"
+singularity: "workflow/container/container.sif"
+
+rule all:
+  input:
+    os.path.join("results", "scores", "scores.json"),
+    os.path.join("results", "scores", "confusion_matrices.json"),
+    expand(os.path.join("results", "scores", "{model}", "none", "{category}.json"),
+           model=["PatchCore", "D2Neighbors", "D2NeighborsL1", "D2NeighborsL4"],
+           category=config["all_categories"]),
+    expand(os.path.join("results", "artifacts", "{artifact}", "{category}"),
+           artifact=["cv2resize", "gaussiannoise", "none"],
+           category=config["categories"]),
+    expand(os.path.join("results", "scores", "{model}", "fnr_{artifact}.pdf"),
+           model=["PatchCore", "D2Neighbors", "D2NeighborsL1", "D2NeighborsL4"],
+           artifact=["cv2resize"]),
+    expand(os.path.join("results", "frequency_attributions", "plots", "{model}", "{artifact}", "{category}_{deployed}_{corrected}.pdf"),
+           category=config["categories"],
+           artifact=config["artifacts"],
+           deployed=["deployed", "undeployed"],
+           corrected=["corrected", "uncorrected"],
+           model=["D2Neighbors"]),
+    expand(os.path.join("results", "pixel_attributions", "plots", "{model}", "{artifact}", "{category}"),
+           model=["D2Neighbors"],
+           artifact=config["artifacts"],
+           category=config["categories"]),
+    expand(os.path.join("results", "pixel_frequency_attributions", "plots", "{model}", "{artifact}", "{category}"),
+           model=["D2Neighbors"],
+           artifact=config["artifacts"],
+           category=config["categories"])
+
+rule plot_artifacts:
+  output:
+    directory(os.path.join("results", "artifacts", "{artifact}", "{category}")),
+  params:
+    n_plot_artifacts = config["n_plot_artifacts"]
+  localrule: True
+  shell:
+    "python -m experiments.plot_artifacts --artifact {wildcards.artifact} --category {wildcards.category} --n-plot-artifacts {params.n_plot_artifacts} --output {output}"
+
+rule aggregate_scores:
+  input:
+    scores = expand(os.path.join("results", "scores", "{model}", "{artifact}", "{category}.json"),
+                    model=["PatchCore", "D2Neighbors", "D2NeighborsL1"],
+                    artifact=["none"],
+                    category=config["all_categories"])
+  output:
+    os.path.join("results", "scores", "scores.json")
+  localrule: True
+  shell:
+    "python -m experiments.aggregate_scores --output {output}"
+
+rule aggregate_confusion_matrices:
+  input:
+    scores = expand(os.path.join("results", "scores", "{model}", "{artifact}", "{category}.json"),
+                    model=["PatchCore", "D2Neighbors", "D2NeighborsL1"],
+                    artifact=["none", "cv2resize"],
+                    category=config["categories"])
+  output:
+    os.path.join("results", "scores", "confusion_matrices.json")
+  localrule: True
+  shell:
+    "python -m experiments.aggregate_confusion_matrices --output {output}"
+
+rule plot_scores:
+  input:
+    scores = expand(os.path.join("results", "scores", "{model}", "{artifact}", "{category}.json"),
+                    model=["PatchCore", "D2Neighbors", "D2NeighborsL1", "D2NeighborsL4"],
+                    artifact=["cv2resize"],
+                    category=config["categories"])
+  output:
+    expand(os.path.join("results", "scores", "{model}", "fnr_{artifact}.pdf"),
+           model=["PatchCore", "D2Neighbors", "D2NeighborsL1", "D2NeighborsL4"],
+           artifact=["cv2resize"])
+  localrule: True
+  shell:
+    "python -m experiments.plot_scores_new"
+
+rule compute_none_scores:
+  output:
+    os.path.join("results", "scores", "{model}", "none", "{category}.json")
+  threads:
+    lambda wildcards: 4 if wildcards.model == "PatchCore" else (4 if (wildcards.model == "D2Neighbors" or wildcards.model == "D2NeighborsL1") else workflow.cores)
+  shell:
+    "python -m experiments.compute_scores --model {wildcards.model} --category {wildcards.category} --output {output}"
+
+rule compute_scores:
+  output:
+    os.path.join("results", "scores", "{model}", "cv2resize", "{category}.json")
+  threads:
+    lambda wildcards: 4 if wildcards.model == "PatchCore" else (4 if (wildcards.model == "D2Neighbors" or wildcards.model == "D2NeighborsL1") else workflow.cores)
+  shell:
+    "python -m experiments.gamma_freqs --model {wildcards.model} --artifact cv2resize --category {wildcards.category} --output {output}"
+
+rule plot_frequency_attributions:
+  input:
+    frequency_path = os.path.join("results", "frequency_attributions", "attributions", "{model}", "{artifact}", "{category}.pt"),
+  output:
+    expand(os.path.join("results", "frequency_attributions", "plots", "{{model}}", "{{artifact}}", "{{category}}_{deployed}_{corrected}.pdf"), deployed=["deployed", "undeployed"], corrected=["corrected", "uncorrected"]),
+  params:
+    output_directory = os.path.join("results", "frequency_attributions", "plots", "{model}", "{artifact}")
+  localrule: True
+  shell:
+    "python -m experiments.gamma_freqs_plot_frequencies --category {wildcards.category} --artifact {wildcards.artifact} --output_directory {params.output_directory} --frequency-file {input.frequency_path} --model {wildcards.model}"
+
+rule compute_frequency_attributions:
+  output:
+    os.path.join("results", "frequency_attributions", "attributions", "{model}", "{artifact}", "{category}.pt")
+  # threads:
+  #   lambda wildcards: 1 if wildcards.model == "D2Neighbors" else workflow.cores
+  params:
+    imsize = config["imsize"]
+  shell:
+    "python -m experiments.gamma_freqs_relevance --model {wildcards.model} --artifact {wildcards.artifact} --category {wildcards.category} --gamma 1.0 --output {output} --imsize {params.imsize}"
+
+rule plot_pixel_attributions:
+  input:
+    undeployed_uncorrected = os.path.join("results", "pixel_attributions", "attributions", "{model}", "{artifact}", "{category}", "uncorrected_undeployed.pt"),
+    undeployed_corrected = os.path.join("results", "pixel_attributions", "attributions", "{model}", "{artifact}", "{category}", "corrected_undeployed.pt"),
+    deployed_uncorrected = os.path.join("results", "pixel_attributions", "attributions", "{model}", "{artifact}", "{category}", "uncorrected_deployed.pt"),
+    deployed_corrected = os.path.join("results", "pixel_attributions", "attributions", "{model}", "{artifact}", "{category}", "corrected_deployed.pt")
+  output:
+    directory(os.path.join("results", "pixel_attributions", "plots", "{model}", "{artifact}", "{category}"))
+  shell:
+    "python -m experiments.plot_explanations \
+            --artifact {wildcards.artifact} \
+            --category {wildcards.category} \
+            --undeployed-uncorrected {input.undeployed_uncorrected} \
+            --undeployed-corrected {input.undeployed_corrected} \
+            --deployed-uncorrected {input.deployed_uncorrected} \
+            --deployed-corrected {input.deployed_corrected} \
+            --output-directory {output}"
+
+rule compute_pixel_attributions:
+  output:
+    os.path.join("results", "pixel_attributions", "attributions", "{model}", "{artifact}", "{category}", "{corrected}_{deployed}.pt")
+  params:
+    corrected = lambda wildcards: "--corrected" if f"{wildcards.corrected}" == "corrected" else "",
+    deployed = lambda wildcards: "--deployed" if f"{wildcards.deployed}" == "deployed" else "",
+    n_heatmaps_per_category = lambda wildcards: config["heatmaps_per_category"][wildcards.category]
+  shell:
+    "python -m experiments.figure_explanations --model {wildcards.model} --artifact {wildcards.artifact} --category {wildcards.category} --gamma 1.0 --output {output} {params.corrected} {params.deployed} --index {params.n_heatmaps_per_category}"
+
+rule plot_pixel_frequency_attributions:
+  input:
+    undeployed_uncorrected = os.path.join("results", "pixel_frequency_attributions", "attributions", "{model}", "{artifact}", "{category}", "uncorrected_undeployed.pt"),
+    undeployed_corrected = os.path.join("results", "pixel_frequency_attributions", "attributions", "{model}", "{artifact}", "{category}", "corrected_undeployed.pt"),
+    deployed_uncorrected = os.path.join("results", "pixel_frequency_attributions", "attributions", "{model}", "{artifact}", "{category}", "uncorrected_deployed.pt"),
+    deployed_corrected = os.path.join("results", "pixel_frequency_attributions", "attributions", "{model}", "{artifact}", "{category}", "corrected_deployed.pt")
+  output:
+    directory(os.path.join("results", "pixel_frequency_attributions", "plots", "{model}", "{artifact}", "{category}"))
+  shell:
+    "python -m experiments.plot_pixel_frequency_attributions \
+            --artifact {wildcards.artifact} \
+            --category {wildcards.category} \
+            --undeployed-uncorrected {input.undeployed_uncorrected} \
+            --undeployed-corrected {input.undeployed_corrected} \
+            --deployed-uncorrected {input.deployed_uncorrected} \
+            --deployed-corrected {input.deployed_corrected} \
+            --output-directory {output}"
+
+rule compute_pixel_frequency_attributions:
+  output:
+    os.path.join("results", "pixel_frequency_attributions", "attributions", "{model}", "{artifact}", "{category}", "{deployed}_{corrected}.pt")
+  params:
+    corrected = lambda wildcards: "--corrected" if f"{wildcards.corrected}" == "corrected" else "",
+    deployed = lambda wildcards: "--deployed" if f"{wildcards.deployed}" == "deployed" else "",
+    low = config["frequency_bands"]["low"],
+    high = config["frequency_bands"]["high"]
+  shell:
+    "python -m experiments.pixel_attribution_frequency_bands --model {wildcards.model} --artifact {wildcards.artifact} --category {wildcards.category} --output {output} {params.deployed} {params.corrected} --low {params.low} --high {params.high}"

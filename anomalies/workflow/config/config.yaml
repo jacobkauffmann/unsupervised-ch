@@ -1,0 +1,45 @@
+models:
+  - D2Neighbors
+  - D2Neighbors
+
+categories:
+  - toothbrush
+  - wood
+  - bottle
+  - pill
+  - capsule
+
+all_categories:
+  - bottle
+  - cable
+  - capsule
+  - carpet
+  - grid
+  - hazelnut
+  - leather
+  - metal_nut
+  - pill
+  - screw
+  - tile
+  - toothbrush
+  - transistor
+  - wood
+  - zipper
+
+artifacts:
+  - cv2resize
+
+heatmaps_per_category:
+  toothbrush: 13
+  wood: 52
+  bottle: 58
+  pill: 1
+  capsule: 40
+
+frequency_bands:
+  low: 3
+  high: 190
+
+n_plot_artifacts: 5
+imsize: 224
+dct_basis_path: src/dct_basis224.pt
