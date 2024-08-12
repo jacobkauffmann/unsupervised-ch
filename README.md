@@ -43,5 +43,5 @@ Place the datasets in the `data/` directory.
 - **TBD**
 
 ## Contact Information:
-- Gregoire Montavon: [gregoire.montavon@fu-berlin.de](mailto:gregoire.montavon@fu-berlin.de)
+- Grégoire Montavon: [gregoire.montavon@fu-berlin.de](mailto:gregoire.montavon@fu-berlin.de)
 - Klaus-Robert Müller: [klaus-robert.mueller@tu-berlin.de](mailto:klaus-robert.mueller@tu-berlin.de)
