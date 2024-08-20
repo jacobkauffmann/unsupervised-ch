@@ -40,7 +40,7 @@ Place the datasets in the `data/` directory.
 
 #### 2.4 Representation Learning
 - Navigate to the `representation/` directory.
-- **TBD**
+- Follow instructions in the README.md file in the respective folder.
 
 ## Contact Information:
 - Grégoire Montavon: [gregoire.montavon@fu-berlin.de](mailto:gregoire.montavon@fu-berlin.de)
